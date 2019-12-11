@@ -168,6 +168,8 @@ adf.test(data$PPI.Lumber_DiffLog)
 reg1a <- lm(data$Y_DiffLog ~ ., data[,17:31])
 summary(reg1a)
 
+plot(reg1a$residuals)
+
 reg_all <- regsubsets(data$Y_DiffLog ~ ., data = data[,17:31], method=c("forward"))
 regall_coef <- names(coef(reg_all, scale="adjr2",5))[-1] #get best variables without intercept
 print(paste("selected variables:",list(regall_coef)))
@@ -233,3 +235,65 @@ colnames(monthly.xts)
 difflog_monthly.xts <- monthly.xts[,c(16:30)]
 reg_monthly_a <- lm(difflog_monthly.xts$Y_DiffLog ~ ., difflog_monthly.xts)
 summary(reg_monthly_a)
+
+reg_all2 <- regsubsets(difflog_monthly.xts$Y_DiffLog ~ ., data = difflog_monthly.xts, method=c("forward"))
+regall_coef2 <- names(coef(reg_all2, scale="adjr2",5))[-1] #get best variables without intercept
+print(paste("selected variables:",list(regall_coef2)))
+
+reg2a <- lm(data$Y_DiffLog ~ data$S5UTIL_DiffLog + data$S5CONS_DiffLog + data$S5COND_dIFFLog + 
+              data$UnemploymentRate_DiffLog + data$GoldPrice_DiffLog, data = data[,17:31])
+summary(reg2a)
+
+reg1b <- lm(difflog_monthly.xts$Y_DiffLog ~ ., data = difflog_monthly.xts[,c(4:15)])
+summary(reg1b)
+
+colnames(difflog_monthly.xts)
+plot(reg_monthly_a$residuals)
+
+library('caret')
+library(lattice)
+library(ggplot2)
+library(lmtest)
+#### 
+####  Breusch-Pagan test ####
+lmtest::bptest(reg_monthly_a)
+
+#### Box-cox Transformation ####
+distBCMod <- caret::BoxCoxTrans(monthly.xts$Y_DiffLog)
+print(distBCMod)
+
+data <- cbind(monthly.xts, dist_new=predict(distBCMod, monthly.xts$Y_DiffLog))
+head(data)
+
+lmMod_bc <- lm(data$dist_new ~ data$S5UTIL_DiffLog + data$S5CONS_DiffLog + data$S5COND_dIFFLog + 
+                 data$UnemploymentRate_DiffLog + data$GoldPrice_DiffLog, data = data[,17:31])
+bptest(lmMod_bc)
+
+par(mfrow = c(2,2))
+plot(lmMod_bc)
+#################################### K-FOLDS ################################################
+#------------------------------------------------
+### k-fold Cross validation
+#------------------------------------------------
+
+### K-Fold Cross Validation
+fold1 <- data_stationary[c(1:60),]
+fold2 <- data_stationary[c(61:120),]
+fold3 <- data_stationary[c(121:180),]
+fold4 <- data_stationary[c(181:238),]
+
+mod_fold1 <- lm(fold1$Y_DiffLog ~ ., data = fold1)
+summary(mod_fold1)
+mod_fold2 <- lm(fold2$Y_DiffLog ~., data = fold2)
+summary(mod_fold2)
+mod_fold3 <- lm(fold3$Y_DiffLog ~ ., data = fold2)
+summary(mod_fold3)
+
+
+preds_fold2 <- predict(mod_fold1, newdata = fold2)
+preds_fold3 <- predict(mod_fold2, newdata = fold3)
+preds_fold4 <- predict(mod_fold3, newdata = fold4)
+
+RMSE(preds_fold2,fold1$Y_DiffLog)
+RMSE(preds_fold3,fold2$Y_DiffLog)
+RMSE(preds_fold4,fold3$Y_DiffLog)
